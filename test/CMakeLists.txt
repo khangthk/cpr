@@ -6,11 +6,13 @@ if (ENABLE_SSL_TESTS)
     add_library(test_server STATIC
                 abstractServer.cpp
                 httpServer.cpp
-                httpsServer.cpp)
+                httpsServer.cpp
+                testUtils.cpp)
 else ()
     add_library(test_server STATIC
                 abstractServer.cpp
-                httpServer.cpp)
+                httpServer.cpp
+                testUtils.cpp)
 endif()
 if(WIN32)
     target_link_libraries(test_server PRIVATE Threads::Threads cpr::cpr GTest::GTest
@@ -26,7 +28,7 @@ macro(add_cpr_test _TEST_NAME)
         test_server
         GTest::GTest
         cpr::cpr
-        CURL::libcurl)
+        ${CURL_LIB})
     add_test(NAME cpr_${_TEST_NAME}_tests COMMAND ${_TEST_NAME}_tests)
     # Group under the "tests" project folder in IDEs such as Visual Studio.
     set_property(TARGET ${_TEST_NAME}_tests PROPERTY FOLDER "tests")
@@ -67,6 +69,10 @@ add_cpr_test(multiasync)
 add_cpr_test(file_upload)
 add_cpr_test(singleton)
 add_cpr_test(threadpool)
+add_cpr_test(testUtils)
+add_cpr_test(connection_pool)
+add_cpr_test(sse)
+add_cpr_test(curlholder)
 
 if (ENABLE_SSL_TESTS)
     add_cpr_test(ssl)

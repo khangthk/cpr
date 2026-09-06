@@ -1,5 +1,5 @@
-#ifndef CPR_SSLOPTIONS_H
-#define CPR_SSLOPTIONS_H
+#ifndef CPR_SSL_OPTIONS_H
+#define CPR_SSL_OPTIONS_H
 
 #include <memory>
 #include <string>
@@ -9,6 +9,7 @@
 #include <curl/curl.h>
 
 #include "cpr/util.h"
+#include "util.h"
 #include <utility>
 
 #ifndef SUPPORT_ALPN
@@ -66,13 +67,18 @@
 #ifndef SUPPORT_CURLOPT_SSL_CTX_FUNCTION
 #define SUPPORT_CURLOPT_SSL_CTX_FUNCTION LIBCURL_VERSION_NUM >= 0x070B00 // 7.11.0
 #endif
+#ifndef SUPPORT_CURLOPT_CAINFO_BLOB
+#define SUPPORT_CURLOPT_CAINFO_BLOB LIBCURL_VERSION_NUM >= 0x074D00 // 7.77.0
+#endif
+#ifndef SUPPORT_CURLOPT_SSLCERT_BLOB
+#define SUPPORT_CURLOPT_SSLCERT_BLOB LIBCURL_VERSION_NUM >= 0x074700 // 7.71.0
+#endif
 
 namespace cpr {
 
 class VerifySsl {
   public:
     VerifySsl() = default;
-    // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
     VerifySsl(bool p_verify) : verify(p_verify) {}
 
     explicit operator bool() const {
@@ -87,14 +93,13 @@ namespace ssl {
 // set SSL client certificate
 class CertFile {
   public:
-    // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
     CertFile(fs::path&& p_filename) : filename(std::move(p_filename)) {}
 
     virtual ~CertFile() = default;
 
     const fs::path filename;
 
-    virtual const char* GetCertType() const {
+    [[nodiscard]] virtual const char* GetCertType() const {
         return "PEM";
     }
 };
@@ -103,33 +108,60 @@ using PemCert = CertFile;
 
 class DerCert : public CertFile {
   public:
-    // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
     DerCert(fs::path&& p_filename) : CertFile(std::move(p_filename)) {}
 
     ~DerCert() override = default;
 
-    const char* GetCertType() const override {
+    [[nodiscard]] const char* GetCertType() const override {
         return "DER";
     }
 };
 
+
+#if SUPPORT_CURLOPT_SSLCERT_BLOB
+class CertBlob {
+  public:
+    CertBlob(std::string&& p_blob) : blob(std::move(p_blob)) {}
+
+    virtual ~CertBlob() = default;
+
+    std::string blob;
+
+    [[nodiscard]] virtual const char* GetCertType() const {
+        return "PEM";
+    }
+};
+
+using PemBlob = CertBlob;
+
+class DerBlob : public CertBlob {
+  public:
+    template <typename BlobType>
+    // NOLINTNEXTLINE(bugprone-forwarding-reference-overload)
+    DerBlob(BlobType&& p_blob) : CertBlob(std::forward<BlobType>(p_blob)) {}
+
+    ~DerBlob() override = default;
+
+    [[nodiscard]] const char* GetCertType() const override {
+        return "DER";
+    }
+};
+#endif
+
 // specify private keyfile for TLS and SSL client cert
 class KeyFile {
   public:
-    // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
     KeyFile(fs::path&& p_filename) : filename(std::move(p_filename)) {}
 
     template <typename FileType, typename PassType>
     KeyFile(FileType&& p_filename, PassType p_password) : filename(std::forward<FileType>(p_filename)), password(std::move(p_password)) {}
 
-    virtual ~KeyFile() {
-        util::secureStringClear(password);
-    }
+    virtual ~KeyFile() = default;
 
     fs::path filename;
-    std::string password;
+    util::SecureString password;
 
-    virtual const char* GetKeyType() const {
+    [[nodiscard]] virtual const char* GetKeyType() const {
         return "PEM";
     }
 };
@@ -137,20 +169,17 @@ class KeyFile {
 #if SUPPORT_CURLOPT_SSLKEY_BLOB
 class KeyBlob {
   public:
-    // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
     KeyBlob(std::string&& p_blob) : blob(std::move(p_blob)) {}
 
     template <typename BlobType, typename PassType>
     KeyBlob(BlobType&& p_blob, PassType p_password) : blob(std::forward<BlobType>(p_blob)), password(std::move(p_password)) {}
 
-    virtual ~KeyBlob() {
-        util::secureStringClear(password);
-    }
+    virtual ~KeyBlob() = default;
 
     std::string blob;
-    std::string password;
+    util::SecureString password;
 
-    virtual const char* GetKeyType() const {
+    [[nodiscard]] virtual const char* GetKeyType() const {
         return "PEM";
     }
 };
@@ -160,7 +189,6 @@ using PemKey = KeyFile;
 
 class DerKey : public KeyFile {
   public:
-    // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
     DerKey(fs::path&& p_filename) : KeyFile(std::move(p_filename)) {}
 
     template <typename FileType, typename PassType>
@@ -168,14 +196,13 @@ class DerKey : public KeyFile {
 
     ~DerKey() override = default;
 
-    const char* GetKeyType() const override {
+    [[nodiscard]] const char* GetKeyType() const override {
         return "DER";
     }
 };
 
 class PinnedPublicKey {
   public:
-    // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
     PinnedPublicKey(std::string&& p_pinned_public_key) : pinned_public_key(std::move(p_pinned_public_key)) {}
 
     const std::string pinned_public_key;
@@ -187,7 +214,6 @@ class PinnedPublicKey {
 class ALPN {
   public:
     ALPN() = default;
-    // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
     ALPN(bool p_enabled) : enabled(p_enabled) {}
 
     explicit operator bool() const {
@@ -204,7 +230,6 @@ class ALPN {
 class NPN {
   public:
     NPN() = default;
-    // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
     NPN(bool p_enabled) : enabled(p_enabled) {}
 
     explicit operator bool() const {
@@ -220,7 +245,6 @@ class NPN {
 class VerifyHost {
   public:
     VerifyHost() = default;
-    // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
     VerifyHost(bool p_enabled) : enabled(p_enabled) {}
 
     explicit operator bool() const {
@@ -234,7 +258,6 @@ class VerifyHost {
 class VerifyPeer {
   public:
     VerifyPeer() = default;
-    // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
     VerifyPeer(bool p_enabled) : enabled(p_enabled) {}
 
     explicit operator bool() const {
@@ -248,7 +271,6 @@ class VerifyPeer {
 // "Certificate Status Request" TLS extension (aka. OCSP stapling).
 class VerifyStatus {
   public:
-    // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
     VerifyStatus(bool p_enabled) : enabled(p_enabled) {}
 
     explicit operator bool() const {
@@ -309,16 +331,24 @@ struct MaxTLSv1_3 {};
 // path to Certificate Authority (CA) bundle
 class CaInfo {
   public:
-    // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
     CaInfo(fs::path&& p_filename) : filename(std::move(p_filename)) {}
 
     fs::path filename;
 };
 
+#if SUPPORT_CURLOPT_CAINFO_BLOB
+// Certificate Authority (CA) bundle as blob
+class CaInfoBlob {
+  public:
+    CaInfoBlob(std::string&& p_blob) : blob(std::move(p_blob)) {}
+
+    std::string blob;
+};
+#endif
+
 // specify directory holding CA certificates
 class CaPath {
   public:
-    // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
     CaPath(fs::path&& p_filename) : filename(std::move(p_filename)) {}
 
     fs::path filename;
@@ -327,7 +357,6 @@ class CaPath {
 #if SUPPORT_CURLOPT_SSL_CTX_FUNCTION
 class CaBuffer {
   public:
-    // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
     CaBuffer(std::string&& p_buffer) : buffer(std::move(p_buffer)) {}
 
     const std::string buffer;
@@ -337,7 +366,6 @@ class CaBuffer {
 // specify a Certificate Revocation List file
 class Crl {
   public:
-    // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
     Crl(fs::path&& p_filename) : filename(std::move(p_filename)) {}
 
     fs::path filename;
@@ -346,7 +374,6 @@ class Crl {
 // specify ciphers to use for TLS
 class Ciphers {
   public:
-    // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
     Ciphers(std::string&& p_ciphers) : ciphers(std::move(p_ciphers)) {}
 
     std::string ciphers;
@@ -356,7 +383,6 @@ class Ciphers {
 // specify ciphers suites to use for TLS 1.3
 class TLS13_Ciphers {
   public:
-    // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
     TLS13_Ciphers(std::string&& p_ciphers) : ciphers(std::move(p_ciphers)) {}
 
     std::string ciphers;
@@ -368,7 +394,6 @@ class TLS13_Ciphers {
 class SessionIdCache {
   public:
     SessionIdCache() = default;
-    // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
     SessionIdCache(bool p_enabled) : enabled(p_enabled) {}
 
     explicit operator bool() const {
@@ -383,7 +408,6 @@ class SessionIdCache {
 class SslFastStart {
   public:
     SslFastStart() = default;
-    // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
     SslFastStart(bool p_enabled) : enabled(p_enabled) {}
 
     explicit operator bool() const {
@@ -397,7 +421,6 @@ class SslFastStart {
 class NoRevoke {
   public:
     NoRevoke() = default;
-    // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
     NoRevoke(bool p_enabled) : enabled(p_enabled) {}
 
     explicit operator bool() const {
@@ -412,14 +435,17 @@ class NoRevoke {
 struct SslOptions {
     // We don't use fs::path here, as this leads to problems using windows
     std::string cert_file;
+#if SUPPORT_CURLOPT_SSLCERT_BLOB
+    util::SecureString cert_blob;
+#endif
     std::string cert_type;
     // We don't use fs::path here, as this leads to problems using windows
     std::string key_file;
 #if SUPPORT_CURLOPT_SSLKEY_BLOB
-    std::string key_blob;
+    util::SecureString key_blob;
 #endif
     std::string key_type;
-    std::string key_pass;
+    util::SecureString key_pass;
     std::string pinned_public_key;
 #if SUPPORT_ALPN
     bool enable_alpn = true;
@@ -439,6 +465,9 @@ struct SslOptions {
 #endif
     // We don't use fs::path here, as this leads to problems using windows
     std::string ca_info;
+#if SUPPORT_CURLOPT_CAINFO_BLOB
+    std::string ca_info_blob;
+#endif
     // We don't use fs::path here, as this leads to problems using windows
     std::string ca_path;
 #if SUPPORT_CURLOPT_SSL_CTX_FUNCTION
@@ -454,17 +483,16 @@ struct SslOptions {
     bool session_id_cache = true;
 #endif
 
-    ~SslOptions() noexcept {
-#if SUPPORT_CURLOPT_SSLKEY_BLOB
-        util::secureStringClear(key_blob);
-#endif
-        util::secureStringClear(key_pass);
-    }
-
     void SetOption(const ssl::CertFile& opt) {
         cert_file = opt.filename.string();
         cert_type = opt.GetCertType();
     }
+#if SUPPORT_CURLOPT_SSLCERT_BLOB
+    void SetOption(const ssl::CertBlob& opt) {
+        cert_blob = opt.blob;
+        cert_type = opt.GetCertType();
+    }
+#endif
     void SetOption(const ssl::KeyFile& opt) {
         key_file = opt.filename.string();
         key_type = opt.GetKeyType();
@@ -566,6 +594,11 @@ struct SslOptions {
     void SetOption(const ssl::CaInfo& opt) {
         ca_info = opt.filename.string();
     }
+#if SUPPORT_CURLOPT_CAINFO_BLOB
+    void SetOption(const ssl::CaInfoBlob& opt) {
+        ca_info_blob = opt.blob;
+    }
+#endif
     void SetOption(const ssl::CaPath& opt) {
         ca_path = opt.filename.string();
     }
@@ -602,7 +635,7 @@ void set_ssl_option(SslOptions& opts, T&& t) {
 template <typename T, typename... Ts>
 void set_ssl_option(SslOptions& opts, T&& t, Ts&&... ts) {
     set_ssl_option(opts, std::forward<T>(t));
-    set_ssl_option(opts, std::move(ts)...);
+    set_ssl_option(opts, std::forward<Ts>(ts)...);
 }
 
 } // namespace priv
@@ -610,7 +643,7 @@ void set_ssl_option(SslOptions& opts, T&& t, Ts&&... ts) {
 template <typename... Ts>
 SslOptions Ssl(Ts&&... ts) {
     SslOptions opts;
-    priv::set_ssl_option(opts, std::move(ts)...);
+    priv::set_ssl_option(opts, std::forward<Ts>(ts)...);
     return opts;
 }
 

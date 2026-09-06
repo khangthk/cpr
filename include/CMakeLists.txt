@@ -14,6 +14,7 @@ target_sources(cpr PRIVATE
     cpr/auth.h
     cpr/bearer.h
     cpr/body.h
+    cpr/body_view.h
     cpr/buffer.h
     cpr/cert_info.h
     cpr/cookies.h
@@ -32,6 +33,7 @@ target_sources(cpr PRIVATE
     cpr/proxies.h
     cpr/proxyauth.h
     cpr/response.h
+    cpr/secure_string.h
     cpr/session.h
     cpr/singleton.h
     cpr/ssl_ctx.h
@@ -98,5 +100,8 @@ else()
   endif()
 endif()
 
-install(DIRECTORY cpr DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-install(DIRECTORY ${PROJECT_BINARY_DIR}/cpr_generated_includes/cpr DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+if (CPR_ENABLE_INSTALL)
+  install(DIRECTORY cpr DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+  install(DIRECTORY ${PROJECT_BINARY_DIR}/cpr_generated_includes/cpr DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+endif()

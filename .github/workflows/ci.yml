@@ -4,7 +4,7 @@ on: [push, workflow_dispatch, pull_request] # Trigger for every push as well as 
 env:
   # Enable verbose output.
   # Repeat up to 5 times to deal with flaky tests.
-  CTEST_OPTIONS: "-V --repeat until-pass:5"
+  CTEST_OPTIONS: "--repeat until-pass:5 --output-on-failure"
   # The OpenSSL path for CI runs. Found via 'brew info openssl'.
   MACOS_OPENSSL_ROOT_DIR: "/opt/homebrew/Cellar/openssl@3/3.3.0"
 
@@ -12,7 +12,7 @@ jobs:
   ubuntu-clang-openssl:
     strategy:
       matrix:
-        container: ["ubuntu:20.04", "ubuntu:22.04", "ubuntu:23.04", "ubuntu:24.04"]
+        container: ["ubuntu:latest", "ubuntu:rolling"]
         systemCurl: [ON, OFF]
         buildType: [Debug, Release]
     runs-on: ubuntu-latest
@@ -21,21 +21,21 @@ jobs:
     - name: Update package list
       run: apt update
     - name: Install Dependencies
-      run: apt install -y git libssl-dev cmake build-essential clang libcurl4-openssl-dev
+      run: apt install -y git libssl-dev cmake build-essential clang libcurl4-openssl-dev libpsl-dev meson libunistring-dev
       env:
         DEBIAN_FRONTEND: noninteractive
     - name: Setup cmake
-      uses: jwlawson/actions-setup-cmake@v1.14
+      uses: jwlawson/actions-setup-cmake@v2.2
       with:
         cmake-version: '3.22.x'
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
     - name: "Build & Test"
       env:
         CPR_BUILD_TESTS: ON
         CPR_BUILD_TESTS_SSL: ON
         CPR_FORCE_OPENSSL_BACKEND: ON
-        USE_SYSTEM_CURL: ${{ matrix.systemCurl }}
+        CPR_USE_SYSTEM_CURL: ${{ matrix.systemCurl }}
       uses: ashutoshvarma/action-cmake-build@master
       with:
         build-dir: ${{ github.workspace }}/build
@@ -49,7 +49,7 @@ jobs:
   ubuntu-gcc-openssl:
     strategy:
       matrix:
-        container: ["ubuntu:20.04", "ubuntu:22.04", "ubuntu:23.04", "ubuntu:24.04"]
+        container: ["ubuntu:latest", "ubuntu:rolling"]
         systemCurl: [ON, OFF]
         buildType: [Debug, Release]
     runs-on: ubuntu-latest
@@ -58,21 +58,21 @@ jobs:
     - name: Update package list
       run: apt update
     - name: Install Dependencies
-      run: apt install -y git libssl-dev cmake build-essential libcurl4-openssl-dev
+      run: apt install -y git libssl-dev cmake build-essential libcurl4-openssl-dev libpsl-dev meson libunistring-dev
       env:
         DEBIAN_FRONTEND: noninteractive
     - name: Setup cmake
-      uses: jwlawson/actions-setup-cmake@v1.14
+      uses: jwlawson/actions-setup-cmake@v2.2
       with:
         cmake-version: '3.22.x'
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
     - name: "Build & Test"
       env:
         CPR_BUILD_TESTS: ON
         CPR_BUILD_TESTS_SSL: ON
         CPR_FORCE_OPENSSL_BACKEND: ON
-        USE_SYSTEM_CURL: ${{ matrix.systemCurl }}
+        CPR_USE_SYSTEM_CURL: ${{ matrix.systemCurl }}
       uses: ashutoshvarma/action-cmake-build@master
       with:
         build-dir: ${{ github.workspace }}/build
@@ -89,15 +89,15 @@ jobs:
     - name: Update package list
       run: sudo apt update
     - name: Install Dependencies
-      run: sudo apt install -y git libssl-dev libmbedtls-dev cmake build-essential
+      run: sudo apt install -y git libssl-dev libmbedtls-dev cmake build-essential libpsl-dev meson libunistring-dev
       env:
         DEBIAN_FRONTEND: noninteractive
     - name: Setup cmake
-      uses: jwlawson/actions-setup-cmake@v1.14
+      uses: jwlawson/actions-setup-cmake@v2.2
       with:
         cmake-version: '3.22.x'
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
     - name: "Build & Test"
       env:
         CPR_BUILD_TESTS: ON
@@ -114,24 +114,21 @@ jobs:
         ctest-options: ${{ env.CTEST_OPTIONS }}
 
   fedora-clang-openssl:
-    strategy:
-      matrix:
-        container: ["fedora:latest"]
     runs-on: ubuntu-latest
-    container: ${{ matrix.container }}
+    container: "fedora:latest"
     steps:
     - name: Update package list
       run: dnf update -y
     - name: Install Dependencies
-      run: dnf install -y gcc clang git gcc gdb make openssl-devel libcurl-devel cmake
+      run: dnf install -y gcc g++ clang git make openssl-devel libcurl-devel cmake libpsl-devel libunistring-devel meson
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
     - name: "Build & Test"
       env:
         CPR_BUILD_TESTS: ON
         CPR_BUILD_TESTS_SSL: ON
         CPR_FORCE_OPENSSL_BACKEND: ON
-        USE_SYSTEM_CURL: OFF
+        CPR_USE_SYSTEM_CURL: OFF
       uses: ashutoshvarma/action-cmake-build@master
       with:
         build-dir: ${{ github.workspace }}/build
@@ -145,24 +142,23 @@ jobs:
   fedora-gcc-openssl:
     strategy:
       matrix:
-        container: ["fedora:latest"]
         systemCurl: [ON, OFF]
         buildType: [Debug, Release]
     runs-on: ubuntu-latest
-    container: ${{ matrix.container }}
+    container: "fedora:latest"
     steps:
     - name: Update package list
       run: dnf update -y
     - name: Install Dependencies
-      run: dnf install -y gcc clang git gcc gdb make openssl-devel libcurl-devel cmake
+      run: dnf install -y gcc g++ clang git make openssl-devel libcurl-devel cmake libpsl-devel libunistring-devel meson
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
     - name: "Build & Test"
       env:
         CPR_BUILD_TESTS: ON
         CPR_BUILD_TESTS_SSL: ON
         CPR_FORCE_OPENSSL_BACKEND: ON
-        USE_SYSTEM_CURL: ${{ matrix.systemCurl }}
+        CPR_USE_SYSTEM_CURL: ${{ matrix.systemCurl }}
       uses: ashutoshvarma/action-cmake-build@master
       with:
         build-dir: ${{ github.workspace }}/build
@@ -170,6 +166,33 @@ jobs:
         cc: gcc
         cxx: g++
         build-type: ${{ matrix.buildType }}
+        run-test: true
+        ctest-options: ${{ env.CTEST_OPTIONS }}
+
+  fedora-gcc-openssl-no-psl:
+    runs-on: ubuntu-latest
+    container: "fedora:latest"
+    steps:
+    - name: Update package list
+      run: dnf update -y
+    - name: Install Dependencies
+      run: dnf install -y git gcc g++ make openssl-devel cmake libunistring-devel
+    - name: Checkout
+      uses: actions/checkout@v7
+    - name: "Build & Test"
+      env:
+        CPR_BUILD_TESTS: ON
+        CPR_BUILD_TESTS_SSL: ON
+        CPR_FORCE_OPENSSL_BACKEND: ON
+        CPR_USE_SYSTEM_CURL: OFF
+        CPR_CURL_USE_LIBPSL: OFF
+      uses: ashutoshvarma/action-cmake-build@master
+      with:
+        build-dir: ${{ github.workspace }}/build
+        source-dir: ${{ github.workspace }}
+        cc: gcc
+        cxx: g++
+        build-type: release
         run-test: true
         ctest-options: ${{ env.CTEST_OPTIONS }}
 
@@ -183,9 +206,9 @@ jobs:
     - name: Update package list
       run: dnf update -y
     - name: Install Dependencies
-      run: dnf install -y gcc clang git gcc gdb make openssl-devel libasan libubsan liblsan libtsan cmake
+      run: dnf install -y gcc g++ clang git make openssl-devel libasan libubsan liblsan libtsan cmake libpsl-devel libunistring-devel meson
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
     - name: "Build & Test"
       env:
         CPR_BUILD_TESTS: ON
@@ -206,8 +229,13 @@ jobs:
         buildType: [Debug, Release]
     runs-on: windows-latest
     steps:
+    - uses: actions/setup-python@v7
+    - name: Install meson
+      run: pip install meson
+    - name: Setup MSVC environment
+      uses: ilammy/msvc-dev-cmd@v1
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
     - name: "Build & Test"
       env:
         CMAKE_GENERATOR: "Visual Studio 17 2022"
@@ -224,10 +252,15 @@ jobs:
   windows-msvc-openssl:
     runs-on: windows-latest
     steps:
+    - uses: actions/setup-python@v7
+    - name: Install meson
+      run: pip install meson
+    - name: Setup MSVC environment
+      uses: ilammy/msvc-dev-cmd@v1
     - name: Install OpenSSL
       run: choco install openssl -y
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
     - name: "Build & Test"
       env:
         CMAKE_GENERATOR: "Visual Studio 17 2022"
@@ -248,12 +281,15 @@ jobs:
         buildType: [Debug, Release]
     runs-on: macos-latest
     steps:
+    - name: Install libpsl
+      run: brew install libpsl
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
     - name: "Build & Test"
       env:
         CPR_BUILD_TESTS: ON
         CPR_BUILD_TESTS_SSL: OFF
+        CPR_USE_SYSTEM_LIB_PSL: ON
       uses: ashutoshvarma/action-cmake-build@master
       with:
         build-dir: ${{ github.workspace }}/build
@@ -267,13 +303,16 @@ jobs:
   macos-clang-darwinssl:
     runs-on: macos-latest
     steps:
+    - name: Install libpsl
+      run: brew install libpsl
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
     - name: "Build & Test"
       env:
         CPR_BUILD_TESTS: ON
         CPR_BUILD_TESTS_SSL: OFF
         CPR_FORCE_DARWINSSL_BACKEND: ON
+        CPR_USE_SYSTEM_LIB_PSL: ON
       uses: ashutoshvarma/action-cmake-build@master
       with:
         build-dir: ${{ github.workspace }}/build
@@ -289,13 +328,16 @@ jobs:
     steps:
     - name: Install OpenSSL
       run: brew install openssl
+    - name: Install libpsl
+      run: brew install libpsl
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
     - name: "Build & Test"
       env:
         CPR_BUILD_TESTS: ON
         CPR_BUILD_TESTS_SSL: ON
         CPR_FORCE_OPENSSL_BACKEND: ON
+        CPR_USE_SYSTEM_LIB_PSL: ON
         OPENSSL_ROOT_DIR: "${{ env.MACOS_OPENSSL_ROOT_DIR }}"
         OPENSSL_LIBRARIES: "${{ env.MACOS_OPENSSL_ROOT_DIR }}/lib"
         LDFLAGS: "-L${{ env.MACOS_OPENSSL_ROOT_DIR }}/lib"
@@ -318,14 +360,17 @@ jobs:
       run: brew install boost
     - name: Install OpenSSL
       run: brew install openssl
+    - name: Install libpsl
+      run: brew install libpsl
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
     - name: "Build & Test"
       env:
         CPR_BUILD_TESTS: ON
         CPR_BUILD_TESTS_SSL: ON
         CPR_FORCE_OPENSSL_BACKEND: ON
         CPR_USE_BOOST_FILESYSTEM: ON
+        CPR_USE_SYSTEM_LIB_PSL: ON
         OPENSSL_ROOT_DIR: "${{ env.MACOS_OPENSSL_ROOT_DIR }}"
         OPENSSL_LIBRARIES: "${{ env.MACOS_OPENSSL_ROOT_DIR }}/lib"
         LDFLAGS: "-L${{ env.MACOS_OPENSSL_ROOT_DIR }}/lib"

@@ -110,13 +110,28 @@ TEST(BodyPostTests, UrlPostBadHostTest) {
     EXPECT_EQ(url, response.url);
     EXPECT_EQ(std::string{}, response.header["content-type"]);
     EXPECT_EQ(0, response.status_code);
-    EXPECT_EQ(ErrorCode::COULDNT_RESOLVE_HOST, response.error.code);
+    // Sometimes the DNS server returns a fake address instead of an NXDOMAIN response, leading to COULDNT_CONNECT.
+    EXPECT_TRUE(response.error.code == ErrorCode::COULDNT_RESOLVE_HOST || response.error.code == ErrorCode::COULDNT_CONNECT);
 }
 
 TEST(BodyPostTests, StringMoveBodyTest) {
     Url url{server->GetBaseUrl() + "/url_post.html"};
     Response response = cpr::Post(url, Body{std::string{"x=5"}});
     std::string expected_text{
+            "{\n"
+            "  \"x\": 5\n"
+            "}"};
+    EXPECT_EQ(expected_text, response.text);
+    EXPECT_EQ(url, response.url);
+    EXPECT_EQ(std::string{"application/json"}, response.header["content-type"]);
+    EXPECT_EQ(201, response.status_code);
+    EXPECT_EQ(ErrorCode::OK, response.error.code);
+}
+
+TEST(BodyPostTests, BodyViewTest) {
+    const Url url{server->GetBaseUrl() + "/url_post.html"};
+    Response response = cpr::Post(url, BodyView{"x=5"});
+    const std::string expected_text{
             "{\n"
             "  \"x\": 5\n"
             "}"};

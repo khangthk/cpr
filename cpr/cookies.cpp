@@ -1,13 +1,16 @@
 #include "cpr/cookies.h"
 #include "cpr/curlholder.h"
+
+#include <algorithm>
 #include <chrono>
 #include <ctime>
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <string_view>
 
 namespace cpr {
-const std::string Cookie::GetDomain() const {
+const std::string& Cookie::GetDomain() const {
     return domain_;
 }
 
@@ -15,7 +18,7 @@ bool Cookie::IsIncludingSubdomains() const {
     return includeSubdomains_;
 }
 
-const std::string Cookie::GetPath() const {
+const std::string& Cookie::GetPath() const {
     return path_;
 }
 
@@ -23,37 +26,37 @@ bool Cookie::IsHttpsOnly() const {
     return httpsOnly_;
 }
 
-const std::chrono::system_clock::time_point Cookie::GetExpires() const {
+std::chrono::system_clock::time_point Cookie::GetExpires() const {
     return expires_;
 }
 
-const std::string Cookie::GetExpiresString() const {
+std::string Cookie::GetExpiresString() const {
     std::stringstream ss;
     std::tm tm{};
     const std::time_t tt = std::chrono::system_clock::to_time_t(expires_);
 #ifdef _WIN32
     gmtime_s(&tm, &tt);
 #else
-    // NOLINTNEXTLINE(misc-include-cleaner) False positive since <ctime> is included
+    // NOLINTNEXTLINE(misc-include-cleaner,cert-err33-c) False positive since <ctime> is included. Also ignore the ret value here.
     gmtime_r(&tt, &tm);
 #endif
     ss << std::put_time(&tm, "%a, %d %b %Y %H:%M:%S GMT");
     return ss.str();
 }
 
-const std::string Cookie::GetName() const {
+const std::string& Cookie::GetName() const {
     return name_;
 }
 
-const std::string Cookie::GetValue() const {
+const std::string& Cookie::GetValue() const {
     return value_;
 }
 
-const std::string Cookies::GetEncoded(const CurlHolder& holder) const {
+std::string Cookies::GetEncoded(const CurlHolder& holder) const {
     std::stringstream stream;
     for (const cpr::Cookie& item : cookies_) {
         // Depending on if encoding is set to "true", we will URL-encode cookies
-        stream << (encode ? holder.urlEncode(item.GetName()) : item.GetName()) << "=";
+        stream << (encode ? std::string_view{holder.urlEncode(item.GetName())} : std::string_view{item.GetName()}) << "=";
 
         // special case version 1 cookies, which can be distinguished by
         // beginning and trailing quotes
@@ -61,7 +64,7 @@ const std::string Cookies::GetEncoded(const CurlHolder& holder) const {
             stream << item.GetValue();
         } else {
             // Depending on if encoding is set to "true", we will URL-encode cookies
-            stream << (encode ? holder.urlEncode(item.GetValue()) : item.GetValue());
+            stream << (encode ? std::string_view{holder.urlEncode(item.GetValue())} : std::string_view{item.GetValue()});
         }
         stream << "; ";
     }
@@ -70,6 +73,16 @@ const std::string Cookies::GetEncoded(const CurlHolder& holder) const {
 
 cpr::Cookie& Cookies::operator[](size_t pos) {
     return cookies_[pos];
+}
+
+cpr::Cookie& Cookies::operator[](const std::string& key) {
+    const auto it = std::find_if(cookies_.begin(), cookies_.end(), [key](const cpr::Cookie& c) { return c.GetName() == key; });
+
+    if (it == cookies_.end()) {
+        throw std::out_of_range{"Cookie: " + key + " does not exist"};
+    }
+
+    return *it;
 }
 
 Cookies::iterator Cookies::begin() {

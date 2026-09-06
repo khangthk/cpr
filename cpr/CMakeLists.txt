@@ -4,9 +4,9 @@ add_library(cpr
         accept_encoding.cpp
         async.cpp
         auth.cpp
-        bearer.cpp
         callback.cpp
         cert_info.cpp
+        connection_pool.cpp
         cookies.cpp
         cprtypes.cpp
         curl_container.cpp
@@ -19,6 +19,7 @@ add_library(cpr
         proxies.cpp
         proxyauth.cpp
         session.cpp
+        sse.cpp
         threadpool.cpp
         timeout.cpp
         unix_socket.cpp
@@ -32,7 +33,7 @@ add_library(cpr
 
 add_library(cpr::cpr ALIAS cpr)
 
-target_link_libraries(cpr PUBLIC CURL::libcurl) # todo should be private, but first dependencies in ssl_options need to be removed
+target_link_libraries(cpr PUBLIC ${CURL_LIB}) # todo should be private, but first dependencies in ssl_options need to be removed
 
 # Fix missing OpenSSL includes for Windows since in 'ssl_ctx.cpp' we include OpenSSL directly
 if(SSL_BACKEND_USED STREQUAL "OpenSSL")
@@ -49,11 +50,13 @@ set_target_properties(cpr
 # Import GNU common install directory variables
 include(GNUInstallDirs)
 
-install(TARGETS cpr
-        EXPORT cprTargets
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+if (CPR_ENABLE_INSTALL)
+        install(TARGETS cpr
+                EXPORT cprTargets
+                RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+                ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+                LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
 
 if(CPR_USE_SYSTEM_CURL)
         # Include CMake helpers for package config files
@@ -65,15 +68,25 @@ if(CPR_USE_SYSTEM_CURL)
                 VERSION ${${PROJECT_NAME}_VERSION}
                 COMPATIBILITY ExactVersion)
 
-        configure_package_config_file(${PROJECT_SOURCE_DIR}/cmake/cprConfig.cmake.in
+        if(SSL_BACKEND_USED STREQUAL "OpenSSL")
+            configure_package_config_file(${PROJECT_SOURCE_DIR}/cmake/cprConfig-ssl.cmake.in
                 "${PROJECT_BINARY_DIR}/cpr/cprConfig.cmake"
                 INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/cpr)
+        else()
+            configure_package_config_file(${PROJECT_SOURCE_DIR}/cmake/cprConfig.cmake.in
+                "${PROJECT_BINARY_DIR}/cpr/cprConfig.cmake"
+                INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/cpr)
+        endif()
 
-        install(FILES ${PROJECT_BINARY_DIR}/cpr/cprConfig.cmake
-                ${PROJECT_BINARY_DIR}/cpr/cprConfigVersion.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/cpr)
+        if (CPR_ENABLE_INSTALL)
+                install(FILES ${PROJECT_BINARY_DIR}/cpr/cprConfig.cmake
+                        ${PROJECT_BINARY_DIR}/cpr/cprConfigVersion.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/cpr)
+        endif()
 endif()
 
-install(EXPORT cprTargets
-        FILE cprTargets.cmake
-        NAMESPACE cpr::
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/cpr)
+if (CPR_ENABLE_INSTALL)
+        install(EXPORT cprTargets
+                FILE cprTargets.cmake
+                NAMESPACE cpr::
+                DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/cpr)
+endif()

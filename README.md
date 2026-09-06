@@ -1,21 +1,21 @@
 # C++ Requests: Curl for People <img align="right" height="40" src="http://i.imgur.com/d9Xtyts.png">
 
-[![Documentation](https://img.shields.io/badge/docs-online-informational?style=flat&link=https://docs.libcpr.org/)](https://docs.libcpr.org/)
+[![Documentation](https://img.shields.io/badge/docs-online-informational?style=flat&link=https://docs.libcpr.dev/)](https://docs.libcpr.dev/)
 ![CI](https://github.com/libcpr/cpr/workflows/CI/badge.svg)
 [![Gitter](https://badges.gitter.im/libcpr/community.svg)](https://gitter.im/libcpr/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
 ## Announcements
 
 * This project is being maintained by [Fabian Sauter](https://github.com/com8) and [Kilian Traub](https://github.com/KingKili).
-* For quick help, and discussion libcpr also offer a [gitter](https://gitter.im/libcpr/community?utm_source=share-link&utm_medium=link&utm_campaign=share-link) chat.
+* For quick help, and discussion libcpr also offers a [gitter](https://gitter.im/libcpr/community?utm_source=share-link&utm_medium=link&utm_campaign=share-link) chat.
 
 ## Supported Releases
-| Release  | Min. C++ Standard | Status | Notes |
-|----------|-------------------|--------|-------|
-| master   | `cpp17` | ![alt text][preview] | |
-| 1.10.x   | `cpp17` | ![alt text][supported] | |
-| 1.9.x    | `cpp11` | ![alt text][supported] | Supported until 01.01.2025 |
-| <= 1.8.x | `cpp11` | ![alt text][unsupported] | |
+| Release                   | Min. C++ Standard | Status                   | Notes |
+|---------------------------|-------------------|--------------------------|-------|
+| master                    | `cpp17`           | ![alt text][preview]     |       |
+| 1.14.x                    | `cpp17`           | ![alt text][supported]   |       |
+| 1.10.x - 1.13.x           | `cpp17`           | ![alt text][unsupported] |       |
+| <= 1.9.x                  | `cpp11`           | ![alt text][unsupported] |       |
 
 [unsupported]: https://img.shields.io/badge/-unsupported-red "unsupported"
 [supported]: https://img.shields.io/badge/-supported-green "supported"
@@ -25,7 +25,7 @@
 
 C++ Requests is a simple wrapper around [libcurl](http://curl.haxx.se/libcurl) inspired by the excellent [Python Requests](https://github.com/kennethreitz/requests) project.
 
-Despite its name, libcurl's easy interface is anything but, and making mistakes, misusing it is a common source of error and frustration. Using the more expressive language facilities of `C++17` (or `C++11` in case you use cpr < 1.10.0), this library captures the essence of making network calls into a few concise idioms.
+Despite its name, libcurl's easy interface is far from simple, and errors and frustration often arise from mistakes or misuse. By leveraging the more expressive features of `C++17` (or `C++11` if using cpr <`= 1.9.x), this library distills the process of making network calls into a few clear and concise idioms.
 
 Here's a quick GET request:
 
@@ -47,16 +47,16 @@ And here's [less functional, more complicated code, without cpr](https://gist.gi
 
 ## Documentation
 
-[![Documentation](https://img.shields.io/badge/docs-online-informational?style=for-the-badge&link=https://docs.libcpr.org/)](https://docs.libcpr.org/)  
-You can find the latest documentation [here](https://docs.libcpr.org/). It's a work in progress, but it should give you a better idea of how to use the library than the [tests](https://github.com/libcpr/cpr/tree/master/test) currently do.
+[![Documentation](https://img.shields.io/badge/docs-online-informational?style=for-the-badge&link=https://docs.libcpr.dev/)](https://docs.libcpr.dev/)
+You can find the latest documentation [here](https://docs.libcpr.dev/). The same content is maintained in the [libcpr/docs](https://github.com/libcpr/docs) repository if you need an offline copy or want to build the docs locally. It's a work in progress, but it should give you a better idea of how to use the library than the [tests](https://github.com/libcpr/cpr/tree/master/test) currently do.
 
 ## Features
 
 C++ Requests currently supports:
 
 * Custom headers
-* Url encoded parameters
-* Url encoded POST values
+* URL-encoded parameters
+* URL-encoded POST values
 * Multipart form POST upload
 * File POST upload
 * Basic authentication
@@ -76,10 +76,11 @@ C++ Requests currently supports:
 * PATCH methods
 * Thread Safe access to [libCurl](https://curl.haxx.se/libcurl/c/threadsafe.html)
 * OpenSSL and WinSSL support for HTTPS requests
+* Server Sent Events (SSE) handling
 
 ## Planned
 
-For a quick overview about the planed features, have a look at the next [Milestones](https://github.com/libcpr/cpr/milestones).
+For a quick overview about the planned features, have a look at the next [Milestones](https://github.com/libcpr/cpr/milestones).
 
 ## Usage
 
@@ -93,7 +94,7 @@ Add the following to your `CMakeLists.txt`.
 ```cmake
 include(FetchContent)
 FetchContent_Declare(cpr GIT_REPOSITORY https://github.com/libcpr/cpr.git
-                         GIT_TAG 3b15fa82ea74739b574d705fea44959b58142eb8) # Replace with your desired git commit from: https://github.com/libcpr/cpr/releases
+                         GIT_TAG f091b2c061b307ee89b164c39976fc9202a1c79d) # Replace with your desired git commit from: https://github.com/libcpr/cpr/releases
 FetchContent_MakeAvailable(cpr)
 ```
 
@@ -104,7 +105,7 @@ target_link_libraries(your_target_name PRIVATE cpr::cpr)
 ```
 
 That should do it!
-There's no need to handle `libcurl` yourself. All dependencies are taken care of for you.  
+There's no need to handle `libcurl` yourself. All dependencies are taken care of for you.
 All of this can be found in an example [**here**](https://github.com/libcpr/example-cmake-fetch-content).
 
 #### find_package():
@@ -146,8 +147,8 @@ ctest -VV # -VV is optional since it enables verbose output
 ```
 
 ### Bazel
+`cpr` is available as a module from the [Bazel Central Registry](https://registry.bazel.build/). Please refer to the [module page](https://registry.bazel.build/modules/cpr) on how to use it within your project.
 
-Please refer to [hedronvision/bazel-make-cc-https-easy](https://github.com/hedronvision/bazel-make-cc-https-easy).
 
 ### Packages for Linux Distributions
 
@@ -170,13 +171,19 @@ The package can be found here: [NuGet.org](https://www.nuget.org/packages/libcpr
 
 On macOS you may install cpr via [MacPorts.org](https://ports.macports.org/port/cpr) (arm64, x86_64, powerpc)
 
+### FreeBSD Port
+
+On FreeBSD, you can issue `pkg install cpr` or use the Ports tree to install it.
+
 ## Requirements
 
 The only explicit requirements are:
 
-* a `C++17` compatible compiler such as Clang or GCC. The minimum required version of GCC is unknown, so if anyone has trouble building this library with a specific version of GCC, do let us know
-* in case you only have a `C++11` compatible compiler available, all versions below cpr 1.9.x are for you. The 1.10.0 release of cpr switches to `C++17` as a requirement.
+* A `C++17` compatible compiler such as Clang or GCC. The minimum required version of GCC is unknown, so if anyone has trouble building this library with a specific version of GCC, do let us know.
+* In case you only have a `C++11` compatible compiler available, all versions below cpr 1.9.x are for you. The 1.10.0 release of cpr switches to `C++17` as a requirement.
 * If you would like to perform https requests `OpenSSL` and its development libraries are required.
+* If you do not use the built-in version of [curl](https://github.com/curl/curl) but instead use your systems version, make sure you use a version `>= 7.71.0`. Lower versions are not supported. This means you need Debian `>= 11` or Ubuntu `>= 22.04 LTS`.
+* [`The Meson Build System`](https://mesonbuild.com/) is required build PSL from source ([PSL support for curl](https://everything.curl.dev/build/deps.html#libpsl)). For more information take a look at the `CPR_CURL_USE_LIBPSL` and `CPR_USE_SYSTEM_LIB_PSL` CMake options.
 
 ## Building cpr - Using vcpkg
 

@@ -1,10 +1,11 @@
 #ifndef CPR_HTTP_VERSION_H
 #define CPR_HTTP_VERSION_H
 
+#include <cstdint>
 #include <curl/curlver.h>
 
 namespace cpr {
-enum class HttpVersionCode {
+enum class HttpVersionCode : uint8_t {
     /**
      * Let libcurl decide which version is the best.
      **/
@@ -46,7 +47,14 @@ enum class HttpVersionCode {
      * Requires prior knowledge that the server supports HTTP 3.0 since there is no gracefully downgrade.
      * Fallback to HTTP 1.1 if negotiation fails.
      **/
-    VERSION_3_0
+    VERSION_3_0,
+#endif
+#if LIBCURL_VERSION_NUM >= 0x075701 // 7.87.1, but corresponds to 7.88.0 tag
+    /**
+     * Enforce HTTP 3.0 requests without fallback.
+     * Requires prior knowledge that the server supports HTTP 3.0 since there is no gracefully downgrade.
+     **/
+    VERSION_3_0_ONLY
 #endif
 };
 

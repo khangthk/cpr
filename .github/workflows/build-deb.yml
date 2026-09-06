@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'The optional semantic version number. If not supplied the branch/tag will be used.'
+        description: 'The optional semantic version number. If not supplied the version from the main cpr CMake project will be used.'
         type: string
 
 jobs:
@@ -13,16 +13,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: "Checkout"
-      uses: actions/checkout@v3
-      with:
-        submodules: true
-        path: cpr
-
+      uses: actions/checkout@v7
       # Install packages necessary for building libcpr and package
     - name: "Update package list"
       run: sudo apt update
     - name: "Install cpr dependencies"
-      run: sudo apt install -y libssl-dev libcurl4-openssl-dev
+      run: sudo apt install -y libssl-dev libcurl4-openssl-dev libpsl-dev
     - name: "Install building tools"
       run: sudo apt install -y cmake debmake devscripts debhelper
       # Set version number
@@ -32,22 +28,22 @@ jobs:
     - name: Set version based on ref
       if: ${{ !inputs.version }}
       run: |
-        mkdir -p cpr/build
-        pushd cpr/build
-        cmake .. -DCPR_BUILD_VERSION_OUTPUT_ONLY=ON
+        mkdir -p build
+        pushd build
+        cmake .. -DCPR_BUILD_VERSION_OUTPUT_ONLY=ON -DCPR_USE_SYSTEM_LIB_PSL=ON -DCPR_USE_SYSTEM_CURL=ON
         echo "RELEASE_VERSION=$(cat version.txt)" >> $GITHUB_ENV
         popd
-        rm -rf cpr/build
+        rm -rf build
     - name: Print Version
       run: echo "deb version will be '${{ env.RELEASE_VERSION }}'"
       # Build package of runtime library
     - name: "Package build of runtime library"
       env: 
         VERSION: ${{ env.RELEASE_VERSION }}
-      run: bash cpr/package-build/build-package.sh cpr
+      run: bash package-build/build-package.sh $(pwd)
 
     - name: "Upload deb-packages"
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: artifact-deb
         path: ./*.deb

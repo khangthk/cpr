@@ -1,9 +1,9 @@
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <gtest/gtest.h>
 
-#include <chrono>
 #include <stdexcept>
 #include <string>
 
@@ -13,6 +13,7 @@
 
 #include "cpr/accept_encoding.h"
 #include "httpServer.hpp"
+#include "testUtils.hpp"
 
 using namespace cpr;
 using namespace std::chrono_literals;
@@ -21,7 +22,7 @@ static HttpServer* server = new HttpServer();
 std::chrono::milliseconds sleep_time{50};
 std::chrono::seconds zero{0};
 
-bool write_data(const std::string_view& /*data*/, intptr_t /*userdata*/) {
+bool write_data(std::string_view /*data*/, intptr_t /*userdata*/) {
     return true;
 }
 
@@ -262,7 +263,7 @@ TEST(MultipleGetTests, HeaderChangeMultipleGetTest) {
         EXPECT_EQ(200, response.status_code);
         EXPECT_EQ(ErrorCode::OK, response.error.code);
     }
-    session.SetHeader(Header{{"key", "value"}});
+    session.SetHeader(Header{{"key", "value"}, {"lorem", "ipsum"}});
     {
         Response response = session.Get();
         std::string expected_text{"Header reflect GET"};
@@ -270,6 +271,19 @@ TEST(MultipleGetTests, HeaderChangeMultipleGetTest) {
         EXPECT_EQ(url, response.url);
         EXPECT_EQ(std::string{"text/html"}, response.header["content-type"]);
         EXPECT_EQ(std::string{"value"}, response.header["key"]);
+        EXPECT_EQ(std::string{"ipsum"}, response.header["lorem"]);
+        EXPECT_EQ(200, response.status_code);
+        EXPECT_EQ(ErrorCode::OK, response.error.code);
+    }
+    Header& headerMap = session.GetHeader();
+    headerMap.erase("key");
+    {
+        Response response = session.Get();
+        std::string expected_text{"Header reflect GET"};
+        EXPECT_EQ(expected_text, response.text);
+        EXPECT_EQ(url, response.url);
+        EXPECT_EQ(std::string{"text/html"}, response.header["content-type"]);
+        EXPECT_EQ(std::string{"ipsum"}, response.header["lorem"]);
         EXPECT_EQ(200, response.status_code);
         EXPECT_EQ(ErrorCode::OK, response.error.code);
     }
@@ -578,7 +592,7 @@ TEST(LowSpeedTests, SetLowSpeedTest) {
     Url url{server->GetBaseUrl() + "/hello.html"};
     Session session;
     session.SetUrl(url);
-    session.SetLowSpeed({1, 1});
+    session.SetLowSpeed({1, std::chrono::seconds(1)});
     Response response = session.Get();
     std::string expected_text{"Hello world!"};
     EXPECT_EQ(expected_text, response.text);
@@ -711,6 +725,23 @@ TEST(BodyTests, SetBodyValueTest) {
     EXPECT_EQ(ErrorCode::OK, response.error.code);
 }
 
+TEST(BodyTests, SetBodyViewTest) {
+    const Url url{server->GetBaseUrl() + "/url_post.html"};
+    Session session;
+    session.SetUrl(url);
+    session.SetBodyView(BodyView{"x=5"});
+    Response response = session.Post();
+    const std::string expected_text{
+            "{\n"
+            "  \"x\": 5\n"
+            "}"};
+    EXPECT_EQ(expected_text, response.text);
+    EXPECT_EQ(url, response.url);
+    EXPECT_EQ(std::string{"application/json"}, response.header["content-type"]);
+    EXPECT_EQ(201, response.status_code);
+    EXPECT_EQ(ErrorCode::OK, response.error.code);
+}
+
 TEST(DigestTests, SetDigestTest) {
     Url url{server->GetBaseUrl() + "/digest_auth.html"};
     Session session;
@@ -723,6 +754,49 @@ TEST(DigestTests, SetDigestTest) {
     EXPECT_EQ(std::string{"text/html"}, response.header["content-type"]);
     EXPECT_EQ(200, response.status_code);
     EXPECT_EQ(ErrorCode::OK, response.error.code);
+}
+
+TEST(AnyAuthTests, SetAnyTest) {
+    Url url{server->GetBaseUrl() + "/digest_auth.html"};
+    Session session;
+    session.SetUrl(url);
+    session.SetAuth({"user", "password", AuthMode::ANY});
+    Response response = session.Get();
+    std::string expected_text{"Header reflect GET"};
+    EXPECT_EQ(expected_text, response.text);
+    EXPECT_EQ(url, response.url);
+    EXPECT_EQ(std::string{"text/html"}, response.header["content-type"]);
+    EXPECT_EQ(200, response.status_code);
+    EXPECT_EQ(ErrorCode::OK, response.error.code);
+}
+
+TEST(AnyAuthTests, SetAnySafeTest) {
+    Authentication auth = {"user", "password", AuthMode::ANYSAFE};
+    {
+        Url url{server->GetBaseUrl() + "/digest_auth.html"};
+        Session session;
+        session.SetUrl(url);
+        session.SetAuth(auth);
+        Response response = session.Get();
+        std::string expected_text{"Header reflect GET"};
+        EXPECT_EQ(expected_text, response.text);
+        EXPECT_EQ(url, response.url);
+        EXPECT_EQ(std::string{"text/html"}, response.header["content-type"]);
+        EXPECT_EQ(200, response.status_code);
+        EXPECT_EQ(ErrorCode::OK, response.error.code);
+    }
+    {
+        Url url{server->GetBaseUrl() + "/basic_auth.html"};
+        Session session;
+        session.SetUrl(url);
+        session.SetAuth(auth);
+        Response response = session.Get();
+        EXPECT_EQ(std::string{"Unauthorized"}, response.text);
+        EXPECT_EQ(url, response.url);
+        EXPECT_EQ(std::string{"text/plain"}, response.header["content-type"]);
+        EXPECT_EQ(401, response.status_code);
+        EXPECT_EQ(ErrorCode::OK, response.error.code);
+    }
 }
 
 TEST(UserAgentTests, SetUserAgentTest) {
@@ -765,8 +839,8 @@ TEST(CookiesTests, BasicCookiesTest) {
     Cookies res_cookies{response.cookies};
     std::string expected_text{"Basic Cookies"};
     cpr::Cookies expectedCookies{
-            {"SID", "31d4d96e407aad42", "127.0.0.1", false, "/", true, std::chrono::system_clock::time_point{} + std::chrono::seconds(3905119080)},
-            {"lang", "en-US", "127.0.0.1", false, "/", true, std::chrono::system_clock::time_point{} + std::chrono::seconds(3905119080)},
+            {"SID", "31d4d96e407aad42", "127.0.0.1", false, "/", true, HttpServer::GetCookieExpiresIn100HoursTimePoint()},
+            {"lang", "en-US", "127.0.0.1", false, "/", true, HttpServer::GetCookieExpiresIn100HoursTimePoint()},
     };
     EXPECT_EQ(std::string{"text/html"}, response.header["content-type"]);
     EXPECT_EQ(200, response.status_code);
@@ -992,9 +1066,34 @@ TEST(DifferentMethodTests, MultipleDeleteHeadPutGetPostTest) {
     Url url{server->GetBaseUrl() + "/header_reflect.html"};
     Url urlPost{server->GetBaseUrl() + "/post_reflect.html"};
     Url urlPut{server->GetBaseUrl() + "/put.html"};
+    Url urlMultipartPost{server->GetBaseUrl() + "/post_file_upload.html"};
     Session session;
     for (size_t i = 0; i < 10; ++i) {
         {
+            session.RemoveContent();
+            session.SetUrl(url);
+            Response response = session.Get();
+            std::string expected_text{"Header reflect GET"};
+            EXPECT_EQ(expected_text, response.text);
+            EXPECT_EQ(url, response.url);
+            EXPECT_EQ(200, response.status_code);
+            EXPECT_EQ(ErrorCode::OK, response.error.code);
+        }
+        {
+            session.RemoveContent();
+            session.SetUrl(urlMultipartPost);
+            std::string fileContentsBinary{"this is a binary payload"};
+            std::string fileExtension = ".myfile";
+            session.SetMultipart(cpr::Multipart{{"files", cpr::Buffer{fileContentsBinary.begin(), fileContentsBinary.end(), "myfile.jpg"}}, {"file_types", "[\"" + fileExtension + "\"]"}});
+            Response response = session.Post();
+            std::string expected_text{"{\n  \"files\": \"myfile.jpg=this is a binary payload\",\n  \"file_types\": \"[\".myfile\"]\"\n}"};
+            EXPECT_EQ(expected_text, response.text);
+            EXPECT_EQ(urlMultipartPost, response.url);
+            EXPECT_EQ(201, response.status_code);
+            EXPECT_EQ(ErrorCode::OK, response.error.code);
+        }
+        {
+            session.RemoveContent();
             session.SetUrl(url);
             Response response = session.Delete();
             std::string expected_text{"Header reflect DELETE"};
@@ -1014,6 +1113,7 @@ TEST(DifferentMethodTests, MultipleDeleteHeadPutGetPostTest) {
             EXPECT_EQ(ErrorCode::OK, response.error.code);
         }
         {
+            session.RemoveContent();
             session.SetUrl(url);
             Response response = session.Get();
             std::string expected_text{"Header reflect GET"};
@@ -1037,6 +1137,7 @@ TEST(DifferentMethodTests, MultipleDeleteHeadPutGetPostTest) {
             EXPECT_EQ(ErrorCode::OK, response.error.code);
         }
         {
+            session.RemoveContent();
             session.SetUrl(url);
             Response response = session.Head();
             std::string expected_text{"Header reflect HEAD"};
@@ -1073,31 +1174,23 @@ TEST(CurlHolderManipulateTests, CustomOptionTest) {
 TEST(LocalPortTests, SetLocalPortTest) {
     Url url{server->GetBaseUrl() + "/local_port.html"};
     Session session;
-    uint16_t local_port{0};
-    uint16_t local_port_range{0};
     Response response;
-
-    // Try up to 10 times to get a free local port
-    for (size_t i = 0; i < 10; i++) {
-        session.SetUrl(url);
-        local_port = 40252 + (i * 100); // beware of HttpServer::GetPort when changing
-        local_port_range = 7000;
-        session.SetLocalPort(local_port);
-        session.SetLocalPortRange(local_port_range);
-        // expected response: body contains port number in specified range
-        // NOTE: even when trying up to 7000 ports there is the chance that all of them are occupied.
-        // It would be possible to also check here for ErrorCode::UNKNOWN_ERROR but that somehow seems
-        // wrong as then this test would pass in case SetLocalPort does not work at all
-        // or in other words: we have to assume that at least one port in the specified range is free.
-        response = session.Get();
-
-        if (response.error.code != ErrorCode::UNKNOWN_ERROR) {
-            break;
-        }
-    }
+    session.SetUrl(url);
+    uint16_t local_port{0};
+    ASSERT_NO_THROW(local_port = cpr::test::get_free_port());
+    uint16_t local_port_range{7000};
+    session.SetLocalPort(local_port);
+    session.SetLocalPortRange(local_port_range);
+    // expected response: body contains port number in specified range
+    // NOTE: even when trying up to 7000 ports there is the chance that all of them are occupied.
+    // It would be possible to also check here for ErrorCode::UNKNOWN_ERROR but that somehow seems
+    // wrong as then this test would pass in case SetLocalPort does not work at all
+    // or in other words: we have to assume that at least one port in the specified range is free.
+    response = session.Get();
 
     EXPECT_EQ(200, response.status_code);
     EXPECT_EQ(ErrorCode::OK, response.error.code);
+    errno = 0;
     // NOLINTNEXTLINE(google-runtime-int)
     unsigned long port_from_response = std::strtoul(response.text.c_str(), nullptr, 10);
     EXPECT_EQ(errno, 0);
@@ -1108,31 +1201,23 @@ TEST(LocalPortTests, SetLocalPortTest) {
 TEST(LocalPortTests, SetOptionTest) {
     Url url{server->GetBaseUrl() + "/local_port.html"};
     Session session;
-    uint16_t local_port{0};
-    uint16_t local_port_range{0};
     Response response;
-
-    // Try up to 10 times to get a free local port
-    for (size_t i = 0; i < 10; i++) {
-        session.SetUrl(url);
-        local_port = 30252 + (i * 100); // beware of HttpServer::GetPort when changing
-        local_port_range = 7000;
-        session.SetOption(LocalPort(local_port));
-        session.SetOption(LocalPortRange(local_port_range));
-        // expected response: body contains port number in specified range
-        // NOTE: even when trying up to 7000 ports there is the chance that all of them are occupied.
-        // It would be possible to also check here for ErrorCode::UNKNOWN_ERROR but that somehow seems
-        // wrong as then this test would pass in case SetLocalPort does not work at all
-        // or in other words: we have to assume that at least one port in the specified range is free.
-        response = session.Get();
-
-        if (response.error.code != ErrorCode::UNKNOWN_ERROR) {
-            break;
-        }
-    }
+    session.SetUrl(url);
+    uint16_t local_port{0};
+    uint16_t local_port_range{7000};
+    ASSERT_NO_THROW(local_port = cpr::test::get_free_port());
+    session.SetOption(LocalPort(local_port));
+    session.SetOption(LocalPortRange(local_port_range));
+    // expected response: body contains port number in specified range
+    // NOTE: even when trying up to 7000 ports there is the chance that all of them are occupied.
+    // It would be possible to also check here for ErrorCode::UNKNOWN_ERROR but that somehow seems
+    // wrong as then this test would pass in case SetLocalPort does not work at all
+    // or in other words: we have to assume that at least one port in the specified range is free.
+    response = session.Get();
 
     EXPECT_EQ(200, response.status_code);
     EXPECT_EQ(ErrorCode::OK, response.error.code);
+    errno = 0;
     // NOLINTNEXTLINE(google-runtime-int)
     unsigned long port_from_response = std::strtoul(response.text.c_str(), nullptr, 10);
     EXPECT_EQ(errno, 0);

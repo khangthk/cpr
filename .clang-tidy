@@ -32,12 +32,20 @@ Checks: '*,
 -altera-id-dependent-backward-branch,
 -bugprone-easily-swappable-parameters,
 -modernize-return-braced-init-list,
+-abseil-string-find-str-contains,
 -cppcoreguidelines-avoid-magic-numbers,
 -readability-magic-numbers,
 -cppcoreguidelines-avoid-do-while,
 -llvmlibc-inline-function-decl,
--altera-struct-pack-align
+-altera-struct-pack-align,
+-boost-use-ranges,
+-cppcoreguidelines-special-member-functions,
+-hicpp-special-member-functions,
+-misc-header-include-cycle,
+-cppcoreguidelines-avoid-const-or-ref-data-members,
+-google-explicit-constructor,
+-hicpp-explicit-conversions
 '
 WarningsAsErrors: '*'
-HeaderFilterRegex: 'src/*.hpp'
+HeaderFilterRegex: 'include\/cpr\/.*\.h(pp)?'
 FormatStyle: file

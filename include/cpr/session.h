@@ -15,8 +15,10 @@
 #include "cpr/auth.h"
 #include "cpr/bearer.h"
 #include "cpr/body.h"
+#include "cpr/body_view.h"
 #include "cpr/callback.h"
 #include "cpr/connect_timeout.h"
+#include "cpr/connection_pool.h"
 #include "cpr/cookies.h"
 #include "cpr/cprtypes.h"
 #include "cpr/curlholder.h"
@@ -36,6 +38,7 @@
 #include "cpr/reserve_size.h"
 #include "cpr/resolve.h"
 #include "cpr/response.h"
+#include "cpr/sse.h"
 #include "cpr/ssl_options.h"
 #include "cpr/timeout.h"
 #include "cpr/unix_socket.h"
@@ -46,6 +49,7 @@
 namespace cpr {
 
 using AsyncResponse = AsyncWrapper<Response>;
+using Content = std::variant<std::monostate, cpr::Payload, cpr::Body, cpr::BodyView, cpr::Multipart>;
 
 class Interceptor;
 class MultiPerform;
@@ -66,8 +70,11 @@ class Session : public std::enable_shared_from_this<Session> {
     void SetParameters(Parameters&& parameters);
     void SetHeader(const Header& header);
     void UpdateHeader(const Header& header);
+    [[nodiscard]] Header& GetHeader();
+    [[nodiscard]] const Header& GetHeader() const;
     void SetTimeout(const Timeout& timeout);
     void SetConnectTimeout(const ConnectTimeout& timeout);
+    void SetConnectionPool(const ConnectionPool& pool);
     void SetAuth(const Authentication& auth);
 // Only supported with libcurl >= 7.61.0.
 // As an alternative use SetHeader and add the token manually.
@@ -87,6 +94,7 @@ class Session : public std::enable_shared_from_this<Session> {
     void SetCookies(const Cookies& cookies);
     void SetBody(Body&& body);
     void SetBody(const Body& body);
+    void SetBodyView(BodyView body);
     void SetLowSpeed(const LowSpeed& low_speed);
     void SetVerifySsl(const VerifySsl& verify);
     void SetUnixSocket(const UnixSocket& unix_socket);
@@ -96,6 +104,7 @@ class Session : public std::enable_shared_from_this<Session> {
     void SetWriteCallback(const WriteCallback& write);
     void SetProgressCallback(const ProgressCallback& progress);
     void SetDebugCallback(const DebugCallback& debug);
+    void SetServerSentEventCallback(const ServerSentEventCallback& sse);
     void SetVerbose(const Verbose& verbose);
     void SetInterface(const Interface& iface);
     void SetLocalPort(const LocalPort& local_port);
@@ -110,6 +119,17 @@ class Session : public std::enable_shared_from_this<Session> {
     void SetAcceptEncoding(AcceptEncoding&& accept_encoding);
     void SetLimitRate(const LimitRate& limit_rate);
 
+    /**
+     * Returns a reference to the content sent in previous request.
+     **/
+    [[nodiscard]] const Content& GetContent() const;
+
+    /**
+     * Removes the content sent in previous request from internal state, so it will not be sent with the next request.
+     * Call this before doing a request that is specified not to send a body, e.g. GET.
+     **/
+    void RemoveContent();
+
     // For cancellable requests
     void SetCancellationParam(std::shared_ptr<std::atomic_bool> param);
 
@@ -121,6 +141,7 @@ class Session : public std::enable_shared_from_this<Session> {
     void SetOption(const Timeout& timeout);
     void SetOption(const ConnectTimeout& timeout);
     void SetOption(const Authentication& auth);
+    void SetOption(const ConnectionPool& pool);
 // Only supported with libcurl >= 7.61.0.
 // As an alternative use SetHeader and add the token manually.
 #if LIBCURL_VERSION_NUM >= 0x073D00
@@ -140,11 +161,13 @@ class Session : public std::enable_shared_from_this<Session> {
     void SetOption(const Cookies& cookies);
     void SetOption(Body&& body);
     void SetOption(const Body& body);
+    void SetOption(BodyView body);
     void SetOption(const ReadCallback& read);
     void SetOption(const HeaderCallback& header);
     void SetOption(const WriteCallback& write);
     void SetOption(const ProgressCallback& progress);
     void SetOption(const DebugCallback& debug);
+    void SetOption(const ServerSentEventCallback& sse);
     void SetOption(const LowSpeed& low_speed);
     void SetOption(const VerifySsl& verify);
     void SetOption(const Verbose& verbose);
@@ -226,6 +249,8 @@ class Session : public std::enable_shared_from_this<Session> {
 
     void AddInterceptor(const std::shared_ptr<Interceptor>& pinterceptor);
 
+    std::shared_ptr<Session> GetSharedPtrFromThis();
+
   private:
     // Interceptors should be able to call the private proceed() function
     friend Interceptor;
@@ -233,7 +258,7 @@ class Session : public std::enable_shared_from_this<Session> {
 
 
     bool chunkedTransferEncoding_{false};
-    std::variant<std::monostate, cpr::Payload, cpr::Body, cpr::Multipart> content_{std::monostate{}};
+    Content content_{std::monostate{}};
     std::shared_ptr<CurlHolder> curl_;
     Url url_;
     Parameters parameters_;
@@ -254,6 +279,7 @@ class Session : public std::enable_shared_from_this<Session> {
         ProgressCallback progresscb_;
         DebugCallback debugcb_;
         CancellationCallback cancellationcb_;
+        ServerSentEventCallback ssecb_;
     };
 
     std::unique_ptr<Callbacks> cbs_{std::make_unique<Callbacks>()};
@@ -270,6 +296,10 @@ class Session : public std::enable_shared_from_this<Session> {
     InterceptorsContainer::const_iterator first_interceptor_;
     bool isUsedInMultiPerform{false};
     bool isCancellable{false};
+
+#if SUPPORT_SSL_NO_REVOKE
+    bool sslNoRevoke_{false};
+#endif
 
     Response makeDownloadRequest();
     Response makeRequest();
@@ -288,7 +318,7 @@ class Session : public std::enable_shared_from_this<Session> {
      **/
     void prepareCommonDownload();
     void prepareHeader();
-    std::shared_ptr<Session> GetSharedPtrFromThis();
+    void prepareProxy();
     CURLcode DoEasyPerform();
     void prepareBodyPayloadOrMultipart() const;
     /**

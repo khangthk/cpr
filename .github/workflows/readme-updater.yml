@@ -15,13 +15,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: "Checkout"
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
       with:
         ref: ${{github.sha}}
     - name: "Replace GIT_TAG"
-      run: sed -i -re 's/(GIT_TAG) [0-9a-f]+/\1 ${{github.sha}}/' README.md
+      run: sed -i -re 's/(GIT_TAG) [^ )]+/\1 ${{github.sha}}/' README.md
     - name: "Commit changes"
-      uses: stefanzweifel/git-auto-commit-action@v5
+      uses: stefanzweifel/git-auto-commit-action@v7
       with:
         commit_message: ${{env.COMMIT_MESSAGE}}
         branch: ${{env.OUTPUT_BRANCH}}

@@ -59,24 +59,25 @@ TEST(ErrorTests, ChronoConnectTimeoutFailure) {
 
 TEST(ErrorTests, LowSpeedTimeFailure) {
     Url url{server->GetBaseUrl() + "/low_speed.html"};
-    Response response = cpr::Get(url, cpr::LowSpeed{1000, 1});
+    Response response = cpr::Get(url, cpr::LowSpeed{1000, std::chrono::seconds(1)});
     // Do not check for the HTTP status code, since libcurl always provides the status code of the header if it was received
     EXPECT_EQ(ErrorCode::OPERATION_TIMEDOUT, response.error.code);
 }
 
 TEST(ErrorTests, LowSpeedBytesFailure) {
     Url url{server->GetBaseUrl() + "/low_speed_bytes.html"};
-    Response response = cpr::Get(url, cpr::LowSpeed{1000, 1});
+    Response response = cpr::Get(url, cpr::LowSpeed{1000, std::chrono::seconds(1)});
     // Do not check for the HTTP status code, since libcurl always provides the status code of the header if it was received
     EXPECT_EQ(ErrorCode::OPERATION_TIMEDOUT, response.error.code);
 }
 
 TEST(ErrorTests, ProxyFailure) {
     Url url{server->GetBaseUrl() + "/hello.html"};
-    Response response = cpr::Get(url, cpr::Proxies{{"http", "http://bad_host.libcpr.org"}});
+    Response response = cpr::Get(url, cpr::Proxies{{"http", "http://bad_host.libcpr.orgoooo"}});
     EXPECT_EQ(url, response.url);
     EXPECT_EQ(0, response.status_code);
-    EXPECT_EQ(ErrorCode::COULDNT_RESOLVE_PROXY, response.error.code);
+    // Sometimes the DNS server returns a fake address instead of an NXDOMAIN response, leading to COULDNT_CONNECT.
+    EXPECT_TRUE(response.error.code == ErrorCode::COULDNT_RESOLVE_PROXY || response.error.code == ErrorCode::COULDNT_CONNECT);
 }
 
 TEST(ErrorTests, BoolFalseTest) {
@@ -89,6 +90,19 @@ TEST(ErrorTests, BoolTrueTest) {
     error.code = ErrorCode::UNSUPPORTED_PROTOCOL;
     EXPECT_TRUE(error);
 }
+
+TEST(ErrorTests, StringReprTest) {
+    Error error;
+    error.code = ErrorCode::UNSUPPORTED_PROTOCOL;
+    EXPECT_EQ(std::to_string(error.code), "UNSUPPORTED_PROTOCOL");
+}
+
+TEST(ErrorTests, StringReprUnknownTest) {
+    Error error;
+    error.code = ErrorCode::UNKNOWN_ERROR;
+    EXPECT_EQ(std::to_string(error.code), "UNKNOWN_ERROR");
+}
+
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);

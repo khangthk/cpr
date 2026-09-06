@@ -1,6 +1,9 @@
 #include "httpServer.hpp"
 #include <array>
 #include <chrono>
+#include <ctime>
+#include <iomanip>
+#include <sstream>
 #include <string>
 #include <system_error>
 #include <thread>
@@ -142,8 +145,25 @@ void HttpServer::OnRequestLowSpeedBytes(mg_connection* conn, mg_http_message* /*
             timer_arg);
 }
 
+std::string HttpServer::GetCookieExpiresIn100HoursString() {
+    static const std::chrono::system_clock::time_point expires = GetCookieExpiresIn100HoursTimePoint();
+    const std::time_t timeT = std::chrono::system_clock::to_time_t(expires);
+    const std::tm* utcTimeT = std::gmtime(&timeT); // NOLINT (concurrency-mt-unsafe) not relevant here
+
+    std::stringstream ss;
+    ss << std::put_time(utcTimeT, "%a, %d %b %Y %T GMT");
+
+    return ss.str();
+}
+
+std::chrono::system_clock::time_point HttpServer::GetCookieExpiresIn100HoursTimePoint() {
+    // Cookie timepoints have a maximum resolution of seconds so floor it to that.
+    static const std::chrono::system_clock::time_point expires = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now() + std::chrono::hours(100));
+    return expires;
+}
+
 void HttpServer::OnRequestBasicCookies(mg_connection* conn, mg_http_message* /*msg*/) {
-    const std::string expires = "Wed, 30 Sep 2093 03:18:00 GMT";
+    const std::string expires = GetCookieExpiresIn100HoursString();
 
     std::string cookie1{"SID=31d4d96e407aad42; Expires=" + expires + "; Secure"};
     std::string cookie2{"lang=en-US; Expires=" + expires + "; Secure"};
@@ -160,7 +180,7 @@ void HttpServer::OnRequestBasicCookies(mg_connection* conn, mg_http_message* /*m
 }
 
 void HttpServer::OnRequestEmptyCookies(mg_connection* conn, mg_http_message* /*msg*/) {
-    const std::string expires = "Wed, 30 Sep 2093 03:18:00 GMT";
+    const std::string expires = GetCookieExpiresIn100HoursString();
 
     std::string cookie1{"SID=; Expires=" + expires + "; Secure"};
     std::string cookie2{"lang=; Expires=" + expires + "; Secure"};
@@ -189,7 +209,7 @@ void HttpServer::OnRequestCookiesReflect(mg_connection* conn, mg_http_message* m
 }
 
 void HttpServer::OnRequestRedirectionWithChangingCookies(mg_connection* conn, mg_http_message* msg) {
-    const std::string expires = "Wed, 30 Sep 2093 03:18:00 GMT";
+    const std::string expires = GetCookieExpiresIn100HoursString();
 
     mg_str* request_cookies{nullptr};
     std::string cookie_str;
@@ -272,6 +292,18 @@ void HttpServer::OnRequestBasicJson(mg_connection* conn, mg_http_message* /*msg*
 }
 
 void HttpServer::OnRequestHeaderReflect(mg_connection* conn, mg_http_message* msg) {
+    if (std::string_view{msg->method.ptr, msg->method.len} == "GET") {
+        if (msg->body.len > 0) {
+            std::string errorMessage{"Bad Request: GET shouldn't contain a body."};
+            SendError(conn, 400, errorMessage);
+            return;
+        } else if (msg->chunk.len > 0) {
+            std::string errorMessage{"Bad Request: GET shouldn't contain a body."};
+            SendError(conn, 400, errorMessage);
+            return;
+        }
+    }
+
     std::string response = "Header reflect " + std::string{msg->method.ptr, msg->method.len};
     std::string headers;
     bool hasContentTypeHeader = false;
@@ -285,7 +317,7 @@ void HttpServer::OnRequestHeaderReflect(mg_connection* conn, mg_http_message* ms
             hasContentTypeHeader = true;
         }
 
-        if (std::string{"Host"} != name && std::string{"Accept"} != name) {
+        if (std::string{"Host"} != name && std::string{"Accept"} != name && std::string{"Content-Length"} != name) {
             if (header.value.ptr) {
                 headers.append(name + ": " + std::string(header.value.ptr, header.value.len) + "\r\n");
             }
@@ -852,6 +884,7 @@ void HttpServer::OnRequestGetDownloadFileLength(mg_connection* conn, mg_http_mes
 
 void HttpServer::OnRequest(mg_connection* conn, mg_http_message* msg) {
     std::string uri = std::string(msg->uri.ptr, msg->uri.len);
+
     if (uri == "/") {
         OnRequestRoot(conn, msg);
     } else if (uri == "/hello.html") {

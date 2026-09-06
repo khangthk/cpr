@@ -16,7 +16,7 @@ class InterceptorMulti;
 
 class MultiPerform {
   public:
-    enum class HttpMethod {
+    enum class HttpMethod : uint8_t {
         UNDEFINED = 0,
         GET_REQUEST,
         POST_REQUEST,
@@ -30,11 +30,11 @@ class MultiPerform {
 
     MultiPerform();
     MultiPerform(const MultiPerform& other) = delete;
-    MultiPerform(MultiPerform&& old) = default;
+    MultiPerform(MultiPerform&& old) noexcept;
     ~MultiPerform();
 
     MultiPerform& operator=(const MultiPerform& other) = delete;
-    MultiPerform& operator=(MultiPerform&& old) noexcept = default;
+    MultiPerform& operator=(MultiPerform&& old) noexcept;
 
     std::vector<Response> Get();
     std::vector<Response> Delete();
@@ -67,7 +67,7 @@ class MultiPerform {
     template <typename CurrentDownloadArgType, typename... DownloadArgTypes>
     void PrepareDownloadSessions(size_t sessions_index, CurrentDownloadArgType current_arg, DownloadArgTypes... args);
     template <typename CurrentDownloadArgType>
-    void PrepareDownloadSessions(size_t sessions_index, CurrentDownloadArgType current_arg);
+    void PrepareDownloadSessions(size_t sessions_index, const CurrentDownloadArgType& current_arg);
     void PrepareDownloadSession(size_t sessions_index, std::ofstream& file);
     void PrepareDownloadSession(size_t sessions_index, const WriteCallback& write);
 
@@ -102,7 +102,7 @@ class MultiPerform {
 };
 
 template <typename CurrentDownloadArgType>
-void MultiPerform::PrepareDownloadSessions(size_t sessions_index, CurrentDownloadArgType current_arg) {
+void MultiPerform::PrepareDownloadSessions(size_t sessions_index, const CurrentDownloadArgType& current_arg) {
     PrepareDownloadSession(sessions_index, current_arg);
 }
 
